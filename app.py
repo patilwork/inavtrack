@@ -730,8 +730,8 @@ if funds_df is not None:
             results_df[col] = pd.to_numeric(results_df[col], errors='coerce')
         
         elapsed = time.time() - start_time
-        fetch_time = datetime.now()
-        scan_time = datetime.now()
+        fetch_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
+        scan_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
         
         # Clear progress and show completion
         progress_container.markdown(f"""
