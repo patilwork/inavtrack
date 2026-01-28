@@ -494,7 +494,7 @@ def scan_all_funds(funds_df: pd.DataFrame, request_delay: int = 100) -> Tuple[pd
         df[col] = pd.to_numeric(df[col], errors='coerce')
     
     elapsed = time.time() - start_time
-    fetch_time = datetime.now()
+    fetch_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
     return df, elapsed, api_calls, fetch_time
 
 
