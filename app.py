@@ -12,6 +12,7 @@ import re
 import time
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
@@ -21,6 +22,7 @@ from streamlit_autorefresh import st_autorefresh
 # ---------- Configuration ----------
 CSV_PATH = "funds.csv"
 REFRESH_INTERVAL_MS = 30000  # 30 seconds
+IST = ZoneInfo("Asia/Kolkata")
 
 # ---------- Custom CSS ----------
 CUSTOM_CSS = """
@@ -454,50 +456,6 @@ def load_funds_csv(csv_path) -> pd.DataFrame:
     return df
 
 
-def scan_all_funds(funds_df: pd.DataFrame, request_delay: int = 100) -> Tuple[pd.DataFrame, float, int, datetime]:
-    """Scan all funds and return results with timing info."""
-    start_time = time.time()
-    session = make_nse_session()
-    results = []
-    api_calls = 0
-    
-    for _, row in funds_df.iterrows():
-        result = {
-            "ISIN": row["ISIN"],
-            "Fund_Name": row["Fund_Name"],
-            "Symbol": None,
-            "LTP": None,
-            "iNAV": None,
-            "Premium_Pct": None,
-            "Premium_Rs": None,
-            "Error": None,
-        }
-        try:
-            symbol = extract_symbol_from_url(row["NSE_URL"])
-            result["Symbol"] = symbol
-            ltp, inav, error = fetch_ltp_inav(session, symbol)
-            api_calls += 2
-            result["LTP"] = ltp
-            result["iNAV"] = inav
-            if error:
-                result["Error"] = error
-            prem_pct, prem_abs = calculate_premium_discount(ltp, inav)
-            result["Premium_Pct"] = prem_pct
-            result["Premium_Rs"] = prem_abs
-        except Exception as e:
-            result["Error"] = str(e)
-        results.append(result)
-        time.sleep(request_delay / 1000.0)
-    
-    df = pd.DataFrame(results)
-    for col in ["Premium_Pct", "Premium_Rs", "LTP", "iNAV"]:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-    
-    elapsed = time.time() - start_time
-    fetch_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
-    return df, elapsed, api_calls, fetch_time
-
-
 def get_consistent_alerts(scan_history: list, premium_threshold: float, discount_threshold: float, min_streak: int = 3) -> dict:
     """
     Find ETFs with consistent premium/discount above threshold for min_streak cycles.
@@ -730,8 +688,8 @@ if funds_df is not None:
             results_df[col] = pd.to_numeric(results_df[col], errors='coerce')
         
         elapsed = time.time() - start_time
-        fetch_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
-        scan_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
+        fetch_time = datetime.now(IST)
+        scan_time = datetime.now(IST)
         
         # Clear progress and show completion
         progress_container.markdown(f"""
@@ -747,8 +705,7 @@ if funds_df is not None:
         </div>
         """, unsafe_allow_html=True)
         
-        time.sleep(1.5)  # Show completion briefly
-        progress_container.empty()  # Clear progress tracker
+        progress_container.empty()
         
         # Store results
         st.session_state.last_scan_time = scan_time
@@ -773,7 +730,7 @@ if funds_df is not None:
         # Calculate countdown
         if auto_refresh and scan_time:
             next_refresh = scan_time + timedelta(milliseconds=REFRESH_INTERVAL_MS)
-            time_remaining = (next_refresh - datetime.now()).total_seconds()
+            time_remaining = (next_refresh - datetime.now(IST)).total_seconds()
             time_remaining = max(0, time_remaining)
             countdown_pct = (time_remaining / (REFRESH_INTERVAL_MS / 1000)) * 100
         else:
@@ -982,7 +939,7 @@ if funds_df is not None:
                     all_history.append(scan_df)
                 
                 full_history = pd.concat(all_history, ignore_index=True)
-                st.download_button(f"⬇️ Download History ({len(st.session_state.scan_history)} scans)", data=full_history.to_csv(index=False), file_name=f"etf_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", mime="text/csv", use_container_width=True)
+                st.download_button(f"⬇️ Download History ({len(st.session_state.scan_history)} scans)", data=full_history.to_csv(index=False), file_name=f"etf_history_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.csv", mime="text/csv", use_container_width=True)
 
 # Footer
 st.markdown("---")
